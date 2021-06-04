@@ -21,7 +21,9 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 myDB(async (client) => {
-  const myDataBase = await client.db("myFirstDatabase").collection("QA-issues");
+  const dbName =
+    process.env.NODE_ENV == "test" ? "myFirstDBTests" : "myFirstDatabase";
+  const myDataBase = await client.db(dbName).collection("QA-issues");
 
   //Sample front-end
   app.route("/:project/").get(function (req, res) {

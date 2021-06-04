@@ -22,6 +22,10 @@ module.exports = function (app, myDataBase) {
     .post(function (req, res) {
       let project = req.params.project;
       const data = req.body;
+      if (!data.issue_text || !data.issue_title || !data.created_by) {
+        res.status(500).send("Required fields should not be empty");
+        return;
+      }
       data.open = 1;
       data.created_on = new Date();
       data.updated_on = new Date();
