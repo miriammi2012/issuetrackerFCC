@@ -23,7 +23,7 @@ const testData = {
   },
 };
 suite("Functional Tests", function () {
-  before((done) => {
+  suiteSetup((done) => {
     myDB(async (client) => {
       const myDataBase = await client
         .db("myFirstDBTests")
