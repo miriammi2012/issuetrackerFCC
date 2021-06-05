@@ -1,6 +1,7 @@
 "use strict";
 
 const { ObjectID } = require("mongodb");
+const { isNaN, toBool } = require("../utils");
 
 module.exports = function (app, myDataBase) {
   app
@@ -8,9 +9,13 @@ module.exports = function (app, myDataBase) {
 
     .get(async function (req, res) {
       let project = req.params.project;
+      let queryData = req.query;
+      !isNaN(queryData.open) &&
+        (queryData.open = queryData.open == "true" ? true : false);
+
       try {
         const data = await myDataBase
-          .find({ project })
+          .find({ project, ...queryData })
           .sort({ created_on: 1 })
           .toArray();
         res.json(data);
@@ -26,7 +31,7 @@ module.exports = function (app, myDataBase) {
         res.status(500).send("Required fields should not be empty");
         return;
       }
-      data.open = 1;
+      isNaN(data.open) && (data.open = true);
       data.created_on = new Date();
       data.updated_on = new Date();
       data.project = project;
@@ -42,7 +47,8 @@ module.exports = function (app, myDataBase) {
     .put(function (req, res) {
       // let project = req.params.project;
 
-      const { _id, open } = req.body;
+      const { _id, open, ...otherUpdates } = req.body;
+      const isOpen = !isNaN(open) ? { open: toBool(open) } : {};
       myDataBase
         .findOneAndUpdate(
           {
@@ -50,15 +56,19 @@ module.exports = function (app, myDataBase) {
           },
           {
             $set: {
-              open: open == "false" ? 0 : 1,
+              ...otherUpdates,
+              ...isOpen,
             },
+          },
+          {
+            returnDocument: "after",
           }
         )
         .then((doc) => {
           res.json(doc.value);
         })
         .catch((err) => {
-          res.status(500).send("error deleting doc!");
+          res.status(500).send("error updating doc!");
           return;
         });
     })
