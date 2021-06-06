@@ -2,7 +2,11 @@
 
 const { ObjectID } = require("mongodb");
 const { isNaN, toBool } = require("../utils");
+const dbConnect = require("../db");
 
+const dbName =
+  process.env.NODE_ENV == "test" ? "myFirstDBTests" : "myFirstDatabase";
+const collectionName = "QA-issues";
 module.exports = function (app, myDataBase) {
   app
     .route("/api/issues/:project")
@@ -12,19 +16,23 @@ module.exports = function (app, myDataBase) {
       let queryData = req.query;
       !isNaN(queryData.open) &&
         (queryData.open = queryData.open == "true" ? true : false);
-
+      let conn = null;
       try {
-        const data = await myDataBase
+        const { db, savedConn } = await dbConnect(dbName, collectionName);
+        conn = savedConn;
+        const data = await db
           .find({ project, ...queryData })
           .sort({ created_on: 1 })
           .toArray();
         res.json(data);
       } catch (error) {
         res.status(500).json(error);
+      } finally {
+        await conn.close();
       }
     })
 
-    .post(function (req, res) {
+    .post(async function (req, res) {
       let project = req.params.project;
       const data = req.body;
       if (!data.issue_text || !data.issue_title || !data.created_by) {
@@ -35,22 +43,29 @@ module.exports = function (app, myDataBase) {
       data.created_on = new Date();
       data.updated_on = new Date();
       data.project = project;
-      myDataBase.insertOne(data, (err, doc) => {
-        if (err) {
-          res.status(500).json(err);
-          return;
-        }
+      let conn = null;
+      try {
+        const { db, savedConn } = await dbConnect(dbName, collectionName);
+        conn = savedConn;
+        const doc = await db.insertOne(data);
         res.json(doc.ops[0]);
-      });
+      } catch (error) {
+        res.status(500).json(error);
+      } finally {
+        await conn.close();
+      }
     })
 
-    .put(function (req, res) {
+    .put(async function (req, res) {
       // let project = req.params.project;
 
       const { _id, open, ...otherUpdates } = req.body;
       const isOpen = !isNaN(open) ? { open: toBool(open) } : {};
-      myDataBase
-        .findOneAndUpdate(
+      let conn = null;
+      try {
+        const { db, savedConn } = await dbConnect(dbName, collectionName);
+        conn = savedConn;
+        const doc = await db.findOneAndUpdate(
           {
             _id: ObjectID(_id),
           },
@@ -63,30 +78,30 @@ module.exports = function (app, myDataBase) {
           {
             returnDocument: "after",
           }
-        )
-        .then((doc) => {
-          res.json(doc.value);
-        })
-        .catch((err) => {
-          res.status(500).send("error updating doc!");
-          return;
-        });
+        );
+        res.json(doc.value);
+      } catch (error) {
+        res.status(500).json(error);
+      } finally {
+        await conn.close();
+      }
     })
 
-    .delete(function (req, res) {
+    .delete(async function (req, res) {
       // let project = req.params.project;
       const { _id } = req.body;
-      myDataBase.findOneAndDelete(
-        {
+      let conn = null;
+      try {
+        const { db, savedConn } = await dbConnect(dbName, collectionName);
+        conn = savedConn;
+        const doc = await db.findOneAndDelete({
           _id: ObjectID(_id),
-        },
-        (err, doc) => {
-          if (err) {
-            res.status(500).send("error deleting doc!");
-            return;
-          }
-          res.json(doc.value);
-        }
-      );
+        });
+        res.json(doc.value);
+      } catch (error) {
+        res.status(500).json(error);
+      } finally {
+        await conn.close();
+      }
     });
 };
