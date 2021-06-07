@@ -7,15 +7,18 @@ const testData = require("./testData");
 
 chai.use(chaiHttp);
 
+const errHandler = (error) => {
+  // console.error(error);
+  throw error;
+};
+
 suite("Functional Tests", function () {
   suiteSetup(async () => {
     await connectToDb(async (db) => {
       await db.deleteMany({
         project: testData.project,
       });
-    }).catch((error) => {
-      console.error(error);
-    });
+    }, errHandler);
   });
   test("Create an issue with every field: POST request to /api/issues/{project}", (done) => {
     chai
@@ -54,8 +57,7 @@ suite("Functional Tests", function () {
       .post("/api/issues/" + testData.project)
       .send({})
       .end((err, res) => {
-        assert.equal(res.status, 500);
-        assert.notStrictEqual(res.body, {});
+        assert.equal(res.body.error, "required field(s) missing");
         done();
       });
   });
@@ -98,8 +100,9 @@ suite("Functional Tests", function () {
           ...testData.put1,
         });
       assert.equal(res.status, 200);
-      assert.equal(res.body.open, false);
-    });
+      assert.equal(res.body.result, "successfully updated");
+      assert.equal(res.body._id, insertedDoc.ops[0]._id);
+    }, errHandler);
   });
   test("Update multiple fields on an issue: PUT request to /api/issues/{project}", async () => {
     await connectToDb(async (db) => {
@@ -113,10 +116,9 @@ suite("Functional Tests", function () {
         });
       let doc = res.body;
       assert.equal(res.status, 200);
-      assert.equal(doc.open, testData.put2.open);
-      assert.equal(doc.issue_text, testData.put2.issue_text);
-      assert.equal(doc.issue_title, testData.put2.issue_title);
-    });
+      assert.equal(res.body.result, "successfully updated");
+      assert.equal(res.body._id, insertedDoc.ops[0]._id);
+    }, errHandler);
   });
   test("Update an issue with missing _id: PUT request to /api/issues/{project}", (done) => {
     chai
@@ -124,7 +126,7 @@ suite("Functional Tests", function () {
       .put("/api/issues/" + testData.project)
       .send({ ...testData.put1 })
       .end((err, res) => {
-        assert.isNull(res.body);
+        assert.equal(res.body.error, "missing _id");
         done();
       });
   });
@@ -138,8 +140,8 @@ suite("Functional Tests", function () {
         .send({
           _id: insertedDoc.ops[0]._id,
         });
-      assert.equal(res.status, 500);
-    });
+      assert.equal(res.body.error, "no update field(s) sent");
+    }, errHandler);
   });
   test("Update an issue with an invalid _id: PUT request to /api/issues/{project}", (done) => {
     chai
@@ -147,7 +149,7 @@ suite("Functional Tests", function () {
       .put("/api/issues/" + testData.project)
       .send({ _id: 1, ...testData.put1 })
       .end((err, res) => {
-        assert.isNull(res.body);
+        assert.equal(res.body.error, "something went wrong");
         done();
       });
   });
@@ -161,7 +163,8 @@ suite("Functional Tests", function () {
           _id: insertedDoc.ops[0]._id,
         });
       assert.equal(res.body._id, insertedDoc.ops[0]._id);
-    });
+      assert.equal(res.body.result, "successfully deleted");
+    }, errHandler);
   });
   test("Delete an issue with an invalid _id: DELETE request to /api/issues/{project}", (done) => {
     chai
@@ -169,7 +172,7 @@ suite("Functional Tests", function () {
       .delete("/api/issues/" + testData.project)
       .send({ _id: 1 })
       .end((err, res) => {
-        assert.isNull(res.body);
+        assert.equal(res.body.error, "could not delete");
         done();
       });
   });
@@ -179,7 +182,7 @@ suite("Functional Tests", function () {
       .delete("/api/issues/" + testData.project)
       .send({})
       .end((err, res) => {
-        assert.isNull(res.body);
+        assert.equal(res.body.error, "missing _id");
         done();
       });
   });

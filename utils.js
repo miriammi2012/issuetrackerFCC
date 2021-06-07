@@ -11,4 +11,7 @@ const toBool = (value) => {
   }
   return value;
 };
-module.exports = { isValidDate, isNaN, toBool };
+const isObjEmpty = (obj) => {
+  return obj && Object.keys(obj).length === 0 && obj.constructor === Object;
+};
+module.exports = { isValidDate, isNaN, toBool, isObjEmpty };

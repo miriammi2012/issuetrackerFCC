@@ -19,12 +19,17 @@ const connect = (dbName, collectionName) => {
       .catch((err) => reject(err));
   });
 };
-const connectToDb = async (cb) => {
+const connectToDb = async (cb, errHandler) => {
   const { dbName, collectionName } = require("./constants");
-  const { db, savedConn } = await connect(dbName, collectionName);
-
-  await cb(db);
-
-  await savedConn.close();
+  let conn = null;
+  try {
+    const { db, savedConn } = await connect(dbName, collectionName);
+    conn = savedConn;
+    await cb(db);
+  } catch (err) {
+    errHandler(err);
+  } finally {
+    await conn.close();
+  }
 };
 module.exports = { connectToDb, connect };
