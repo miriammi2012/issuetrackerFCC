@@ -13,10 +13,11 @@ module.exports = function (app) {
       let queryData = req.query;
       !isNaN(queryData.open) &&
         (queryData.open = queryData.open == "true" ? true : false);
+      !isNaN(queryData._id) && (queryData._id = ObjectID(queryData._id));
       await connectToDb(
         async (db) => {
           const data = await db
-            .find({ project, ...queryData }, { project: -1 })
+            .find({ project, ...queryData }, { projection: { project: 0 } })
             .sort({ created_on: 1 })
             .toArray();
           res.json(data);
@@ -66,7 +67,7 @@ module.exports = function (app) {
       }
       await connectToDb(
         async (db) => {
-          const doc = await db.findOneAndUpdate(
+          const result = await db.updateOne(
             {
               _id: ObjectID(_id),
             },
@@ -76,18 +77,16 @@ module.exports = function (app) {
                 ...boolFields,
                 updated_on: new Date(),
               },
-            },
-            {
-              returnDocument: "after",
             }
           );
-          if (doc.value) {
+          if (result.matchedCount > 0) {
             res.json({ result: "successfully updated", _id });
           } else {
-            res.json({ error: "something went wrong", _id });
+            res.json({ error: "could not update", _id });
           }
         },
-        (_) => {
+        (err) => {
+          console.error(err);
           res.json({ error: "could not update", _id });
         }
       );
@@ -101,16 +100,17 @@ module.exports = function (app) {
       }
       await connectToDb(
         async (db) => {
-          const doc = await db.findOneAndDelete({
+          const result = await db.deleteOne({
             _id: ObjectID(_id),
           });
-          if (doc.value) {
+          if (result.deletedCount > 0) {
             return res.json({ result: "successfully deleted", _id });
           } else {
             return res.json({ error: "could not delete", _id });
           }
         },
-        (_) => {
+        (err) => {
+          console.error(err);
           return res.json({ error: "could not delete", _id });
         }
       );

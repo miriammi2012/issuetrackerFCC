@@ -149,7 +149,7 @@ suite("Functional Tests", function () {
       .put("/api/issues/" + testData.project)
       .send({ _id: 1, ...testData.put1 })
       .end((err, res) => {
-        assert.equal(res.body.error, "something went wrong");
+        assert.equal(res.body.error, "could not update");
         done();
       });
   });
