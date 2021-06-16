@@ -1,7 +1,7 @@
 require("dotenv").config();
 const { MongoClient } = require("mongodb");
 
-const connect = (dbName, collectionName) => {
+const connect = (dbName) => {
   const URI = process.env.MONGO_URI;
   return new Promise((resolve, reject) => {
     let savedConn = null;
@@ -11,22 +11,21 @@ const connect = (dbName, collectionName) => {
     })
       .then((conn) => {
         savedConn = conn;
-        return conn.db(dbName).collection(collectionName);
-      })
-      .then((db) => {
+        let db = conn.db(dbName);
         resolve({ db, savedConn });
       })
       .catch((err) => reject(err));
   });
 };
 const connectToDb = async (cb, errHandler) => {
-  const { dbName, collectionName } = require("./constants");
+  const { dbName } = require("./constants");
   let conn = null;
   try {
-    const { db, savedConn } = await connect(dbName, collectionName);
+    const { db, savedConn } = await connect(dbName);
     conn = savedConn;
     await cb(db);
   } catch (err) {
+    console.error(err);
     errHandler(err);
   } finally {
     await conn.close();

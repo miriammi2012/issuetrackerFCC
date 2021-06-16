@@ -19,24 +19,6 @@ module.exports = {
     issue_title: "post3 title",
     created_by: "afroz",
   },
-  post4: {
-    open: true,
-    issue_text: "post4",
-    issue_title: "post4 title",
-    created_by: "rahaman",
-  },
-  post5: {
-    open: true,
-    issue_text: "post5",
-    issue_title: "post5 title",
-    created_by: "rahaman",
-  },
-  post6: {
-    open: true,
-    issue_text: "post6",
-    issue_title: "post6 title",
-    created_by: "chotu",
-  },
   put1: {
     open: false,
   },

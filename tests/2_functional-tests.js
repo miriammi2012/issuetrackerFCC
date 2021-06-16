@@ -8,16 +8,17 @@ const testData = require("./testData");
 chai.use(chaiHttp);
 
 const errHandler = (error) => {
-  // console.error(error);
   throw error;
 };
 
+let postId = null;
 suite("Functional Tests", function () {
   suiteSetup(async () => {
     await connectToDb(async (db) => {
-      await db.deleteMany({
-        project: testData.project,
-      });
+      const issuesCollection = db.collection("issues");
+      const projectsCollection = db.collection("projects");
+      await issuesCollection.deleteMany({});
+      await projectsCollection.deleteMany({});
     }, errHandler);
   });
   test("Create an issue with every field: POST request to /api/issues/{project}", (done) => {
@@ -27,7 +28,6 @@ suite("Functional Tests", function () {
       .send(testData.post1)
       .end((err, res) => {
         assert.equal(res.status, 200);
-        assert.equal(res.body.project, testData.project);
         assert.equal(res.body.open, true);
         assert.equal(res.body.issue_text, testData.post1.issue_text);
         assert.equal(res.body.issue_title, testData.post1.issue_title);
@@ -43,7 +43,6 @@ suite("Functional Tests", function () {
       .send(testData.post2)
       .end((err, res) => {
         assert.equal(res.status, 200);
-        assert.equal(res.body.project, testData.project);
         assert.equal(res.body.open, true);
         assert.equal(res.body.issue_text, testData.post2.issue_text);
         assert.equal(res.body.issue_title, testData.post2.issue_title);
@@ -89,36 +88,39 @@ suite("Functional Tests", function () {
         done();
       });
   });
-  test("Update one field on an issue: PUT request to /api/issues/{project}", async () => {
-    await connectToDb(async (db) => {
-      const insertedDoc = await db.insertOne(testData.post3);
-      const res = await chai
-        .request(server)
-        .put("/api/issues/" + testData.project)
-        .send({
-          _id: insertedDoc.ops[0]._id,
-          ...testData.put1,
-        });
-      assert.equal(res.status, 200);
-      assert.equal(res.body.result, "successfully updated");
-      assert.equal(res.body._id, insertedDoc.ops[0]._id);
-    }, errHandler);
+  test("Update one field on an issue: PUT request to /api/issues/{project}", (done) => {
+    chai
+      .request(server)
+      .post("/api/issues/" + testData.project)
+      .send(testData.post3)
+      .end((err, res) => {
+        postId = res.body._id;
+        chai
+          .request(server)
+          .put("/api/issues/" + testData.project)
+          .send({
+            _id: postId,
+            ...testData.put1,
+          })
+          .end((err, res) => {
+            assert.equal(res.status, 200);
+            assert.equal(res.body.result, "successfully updated");
+            assert.equal(res.body._id, postId);
+            done();
+          });
+      });
   });
   test("Update multiple fields on an issue: PUT request to /api/issues/{project}", async () => {
-    await connectToDb(async (db) => {
-      const insertedDoc = await db.insertOne(testData.post4);
-      const res = await chai
-        .request(server)
-        .put("/api/issues/" + testData.project)
-        .send({
-          _id: insertedDoc.ops[0]._id,
-          ...testData.put2,
-        });
-      let doc = res.body;
-      assert.equal(res.status, 200);
-      assert.equal(res.body.result, "successfully updated");
-      assert.equal(res.body._id, insertedDoc.ops[0]._id);
-    }, errHandler);
+    const res = await chai
+      .request(server)
+      .put("/api/issues/" + testData.project)
+      .send({
+        _id: postId,
+        ...testData.put2,
+      });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.result, "successfully updated");
+    assert.equal(res.body._id, postId);
   });
   test("Update an issue with missing _id: PUT request to /api/issues/{project}", (done) => {
     chai
@@ -131,17 +133,13 @@ suite("Functional Tests", function () {
       });
   });
   test("Update an issue with no fields to update: PUT request to /api/issues/{project}", async () => {
-    await connectToDb(async (db) => {
-      const insertedDoc = await db.insertOne(testData.post5);
-
-      const res = await chai
-        .request(server)
-        .put("/api/issues/" + testData.project)
-        .send({
-          _id: insertedDoc.ops[0]._id,
-        });
-      assert.equal(res.body.error, "no update field(s) sent");
-    }, errHandler);
+    const res = await chai
+      .request(server)
+      .put("/api/issues/" + testData.project)
+      .send({
+        _id: postId,
+      });
+    assert.equal(res.body.error, "no update field(s) sent");
   });
   test("Update an issue with an invalid _id: PUT request to /api/issues/{project}", (done) => {
     chai
@@ -154,17 +152,14 @@ suite("Functional Tests", function () {
       });
   });
   test("Delete an issue: DELETE request to /api/issues/{project}", async () => {
-    await connectToDb(async (db) => {
-      const insertedDoc = await db.insertOne(testData.post6);
-      const res = await chai
-        .request(server)
-        .delete("/api/issues/" + testData.project)
-        .send({
-          _id: insertedDoc.ops[0]._id,
-        });
-      assert.equal(res.body._id, insertedDoc.ops[0]._id);
-      assert.equal(res.body.result, "successfully deleted");
-    }, errHandler);
+    const res = await chai
+      .request(server)
+      .delete("/api/issues/" + testData.project)
+      .send({
+        _id: postId,
+      });
+    assert.equal(res.body._id, postId);
+    assert.equal(res.body.result, "successfully deleted");
   });
   test("Delete an issue with an invalid _id: DELETE request to /api/issues/{project}", (done) => {
     chai

@@ -5,13 +5,12 @@ const isValidDate = (dateStr) => {
 const isNaN = (value) => {
   return value === null || value === undefined;
 };
-const toBool = (value) => {
-  if (typeof value != "boolean" && !isNaN(value)) {
+const stringToBool = (value) => {
+  if (typeof value != "boolean" && typeof value == "string") {
     return value === "true" ? true : false;
   }
-  return value;
 };
 const isObjEmpty = (obj) => {
   return obj && Object.keys(obj).length === 0 && obj.constructor === Object;
 };
-module.exports = { isValidDate, isNaN, toBool, isObjEmpty };
+module.exports = { isValidDate, isNaN, stringToBool, isObjEmpty };

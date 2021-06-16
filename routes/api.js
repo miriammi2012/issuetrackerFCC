@@ -1,7 +1,7 @@
 "use strict";
 
-const { ObjectID } = require("mongodb");
-const { isNaN, toBool, isObjEmpty } = require("../utils");
+const { ObjectID, ObjectId } = require("mongodb");
+const { isNaN, stringToBool, isObjEmpty } = require("../utils");
 const { connectToDb } = require("../db");
 
 module.exports = function (app) {
@@ -11,16 +11,24 @@ module.exports = function (app) {
     .get(async function (req, res) {
       let project = req.params.project;
       let queryData = req.query;
-      !isNaN(queryData.open) &&
-        (queryData.open = queryData.open == "true" ? true : false);
+      !isNaN(queryData.open) && (queryData.open = stringToBool(queryData.open));
       !isNaN(queryData._id) && (queryData._id = ObjectID(queryData._id));
       await connectToDb(
         async (db) => {
-          const data = await db
-            .find({ project, ...queryData }, { projection: { project: 0 } })
-            .sort({ created_on: 1 })
+          const projectsCollection = db.collection("projects");
+          const issuesCollection = db.collection("issues");
+          const projectData = await projectsCollection
+            .find({ project })
             .toArray();
-          res.json(data);
+          const issues = await issuesCollection
+            .find({
+              _id: {
+                $in: projectData.length != 0 ? projectData[0].issueIds : [],
+              },
+              ...queryData,
+            })
+            .toArray();
+          res.json(issues);
         },
         (error) => {
           res.status(500).json(error);
@@ -41,11 +49,30 @@ module.exports = function (app) {
       data.updated_on = now;
       isNaN(data.assigned_to) && (data.assigned_to = "");
       isNaN(data.status_text) && (data.status_text = "");
-      data.project = project;
+      data._id = ObjectId();
       await connectToDb(
         async (db) => {
-          const doc = await db.insertOne(data);
-          res.json(doc.ops[0]);
+          const projectsCollection = db.collection("projects");
+          const issuesCollection = db.collection("issues");
+          const issueObj = await issuesCollection.insertOne(data);
+          if (issueObj.insertedCount > 0) {
+            const result = await projectsCollection.updateOne(
+              { project },
+              {
+                $push: {
+                  issueIds: issueObj.ops[0]._id,
+                },
+              },
+              {
+                upsert: true,
+              }
+            );
+            if (result.matchedCount > 0 || result.upsertedCount > 0) {
+              return res.json(issueObj.ops[0]);
+            } else {
+              return res.status(500).json({ error: "could not insert" });
+            }
+          }
         },
         (error) => {
           res.status(500).json(error);
@@ -54,27 +81,25 @@ module.exports = function (app) {
     })
 
     .put(async function (req, res) {
-      // let project = req.params.project;
-
-      const { _id, open, ...otherUpdates } = req.body;
+      const { _id, ...updates } = req.body;
       if (!_id) {
         return res.json({ error: "missing _id" });
       }
-      const boolFields = !isNaN(open) ? { open: toBool(open) } : {};
+      !isNaN(updates.open) && (updates.open = stringToBool(updates.open));
 
-      if (isObjEmpty(boolFields) && isObjEmpty(otherUpdates)) {
+      if (isObjEmpty(updates)) {
         return res.json({ error: "no update field(s) sent", _id });
       }
       await connectToDb(
         async (db) => {
-          const result = await db.updateOne(
+          const issuesCollection = await db.collection("issues");
+          const result = await issuesCollection.updateOne(
             {
               _id: ObjectID(_id),
             },
             {
               $set: {
-                ...otherUpdates,
-                ...boolFields,
+                ...updates,
                 updated_on: new Date(),
               },
             }
@@ -93,24 +118,37 @@ module.exports = function (app) {
     })
 
     .delete(async function (req, res) {
-      // let project = req.params.project;
+      let project = req.params.project;
       const { _id } = req.body;
       if (!_id) {
         return res.json({ error: "missing _id" });
       }
       await connectToDb(
         async (db) => {
-          const result = await db.deleteOne({
+          const projectsCollection = await db.collection("projects");
+          const issuesCollection = await db.collection("issues");
+          const result = await issuesCollection.deleteOne({
             _id: ObjectID(_id),
           });
           if (result.deletedCount > 0) {
-            return res.json({ result: "successfully deleted", _id });
+            const projects = await projectsCollection.updateOne(
+              { project },
+              {
+                $pull: {
+                  issueIds: ObjectID(_id),
+                },
+              }
+            );
+            if (projects.matchedCount > 0 && projects.modifiedCount > 0) {
+              return res.json({ result: "successfully deleted", _id });
+            } else {
+              return res.status(500).json({ error: "could not delete", _id });
+            }
           } else {
             return res.json({ error: "could not delete", _id });
           }
         },
         (err) => {
-          console.error(err);
           return res.json({ error: "could not delete", _id });
         }
       );
