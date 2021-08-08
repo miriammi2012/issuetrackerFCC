@@ -1,12 +1,12 @@
 {
   "restartable": "rs",
-  "ignore": [".git", "node_modules/**/node_modules"],
+  "ignore": [".git", "node_modules/**/node_modules",".gitignore"],
   "verbose": true,
   "watch": [
-    "./views/pug/*",
     "./server.js",
-    "./connection.js",
     "./routes/*",
+    "./services/*",
+    "./views/*",
     "./public/*"
   ],
   "env": {
